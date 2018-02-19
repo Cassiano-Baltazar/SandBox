@@ -24,10 +24,18 @@ object Form1: TForm1
     Top = 8
     Width = 125
     Height = 150
+    OnClick = Image2Click
   end
   object Label1: TLabel
     Left = 139
-    Top = 144
+    Top = 148
+    Width = 51
+    Height = 13
+    Caption = 'Tamanho: '
+  end
+  object Label2: TLabel
+    Left = 8
+    Top = 343
     Width = 51
     Height = 13
     Caption = 'Tamanho: '
@@ -72,15 +80,25 @@ object Form1: TForm1
     Left = 8
     Top = 164
     Width = 368
-    Height = 353
+    Height = 173
     Lines.Strings = (
       'Memo1')
     ScrollBars = ssBoth
     TabOrder = 4
     OnChange = Memo1Change
   end
+  object Memo2: TMemo
+    Left = 8
+    Top = 359
+    Width = 365
+    Height = 158
+    Lines.Strings = (
+      'Memo2')
+    TabOrder = 5
+    OnChange = Memo2Change
+  end
   object OpenDialog1: TOpenDialog
-    Filter = 'jpg|*.jpg'
+    Filter = 'jpg|*.jpg;*.gif'
     Options = [ofHideReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing]
     Left = 56
     Top = 36

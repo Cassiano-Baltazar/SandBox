@@ -17,14 +17,22 @@ type
     OpenDialog1: TOpenDialog;
     Memo1: TMemo;
     Label1: TLabel;
+    Memo2: TMemo;
+    Label2: TLabel;
     procedure Button3Click(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure Memo1Change(Sender: TObject);
     procedure Button4Click(Sender: TObject);
+    procedure Memo2Change(Sender: TObject);
+    procedure Image2Click(Sender: TObject);
   private
     { Private declarations }
     compress: Boolean;
+    function StreamToBase64(Value: TMemoryStream): string;
+    function Base64ToStream(Value: String): TBytesStream;
+    function CompactStream(Value: TMemoryStream): TMemoryStream;
+    function UnpackStram(Value: TMemoryStream): TMemoryStream;
   public
     { Public declarations }
   end;
@@ -38,6 +46,22 @@ uses
   System.ZLib, Vcl.AxCtrls, IdCoderMIME;
 
 {$R *.dfm}
+
+function TForm1.Base64ToStream(Value: String): TBytesStream;
+var
+  dm: TIdDecoderMIME;
+begin
+  Result := TBytesStream.Create;
+  dm := TIdDecoderMIME.Create(nil);
+  try
+    dm.DecodeBegin(Result);
+    dm.Decode(Value);
+    dm.DecodeEnd;
+    Result.Position := 0;
+  finally
+    dm.Free;
+  end;
+end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
@@ -74,7 +98,7 @@ begin
     try
       Image1.Picture.Graphic.SaveToStream(ms);
       ms.Position := 0;
-      Memo1.Text := TIdEncoderMIME.EncodeStream(ms, ms.Size);
+      Memo1.Text := StreamToBase64(ms);
     finally
       ms.Free;
     end;
@@ -83,41 +107,23 @@ end;
 
 procedure TForm1.Button3Click(Sender: TObject);
 var
-  LInput: TMemoryStream;
-  LOutput: TMemoryStream;
-  LOutput2: TFileStream;
-  LZip: TZCompressionStream;
+  ms1, ms2: TMemoryStream;
 begin
   compress := True;
   if Image1.Picture.Graphic <> nil then
   begin
-    { Create the Input, Output, and Compressed streams. }
-    LInput := TMemoryStream.Create;
+    ms1 := TMemoryStream.Create;
     try
-      Image1.Picture.Graphic.SaveToStream(LInput);
-      LInput.Position := 0;
-      LOutput := TMemoryStream.Create;
+      Image1.Picture.Graphic.SaveToStream(ms1);
+      ms1.Position := 0;
+      ms2 := CompactStream(ms1);
       try
-        LOutput2 := TFileStream.Create('C:\Dype\text.zip', fmCreate);
-        try
-          LZip := TZCompressionStream.Create(clMax, LOutput2);
-          try
-            { Compress data. }
-            LZip.CopyFrom(LInput, LInput.Size);
-          finally
-            LZip.Free;
-          end;
-        finally
-          LOutput2.Free;
-        end;
-        LOutput.LoadFromFile('C:\Dype\text.zip');
-        Memo1.Text := TIdEncoderMIME.EncodeStream(LOutput, LOutput.Size);
-        DeleteFile('C:\Dype\text.zip');
+        Memo2.Text := StreamToBase64(ms2);
       finally
-        LOutput.Free;
+        ms2.Free;
       end;
     finally
-      LInput.Free;
+      ms1.Free;
     end;
   end;
 end;
@@ -135,19 +141,11 @@ begin
   begin
     og := TOleGraphic.Create;
     try
-      bs := TBytesStream.Create;
+      bs := Base64ToStream(Memo1.Text);
       try
-        dm := TIdDecoderMIME.Create(nil);
-        try
-          dm.DecodeBegin(bs);
-          dm.Decode(Memo1.Text);
-          dm.DecodeEnd;
-          bs.Position := 0;
-          og.LoadFromStream(bs);
-          Image2.Picture.Assign(og);
-        finally
-          dm.Free;
-        end;
+        bs.Position := 0;
+        og.LoadFromStream(bs);
+        Image2.Picture.Assign(og);
       finally
         bs.Free;
       end;
@@ -157,36 +155,20 @@ begin
   end
   else
   begin
-    bs := TBytesStream.Create;
+    bs := Base64ToStream(Memo2.Text);
     try
-      dm := TIdDecoderMIME.Create(nil);
+      bs.Position := 0;
+      LOutput := UnpackStram(bs);
       try
-        dm.DecodeBegin(bs);
-        dm.Decode(Memo1.Text);
-        dm.DecodeEnd;
-        bs.Position := 0;
-        LOutput := TMemoryStream.Create;
+        og := TOleGraphic.Create;
         try
-          LUnZip := TZDecompressionStream.Create(bs);
-          try
-            { Decompress data. }
-            LOutput.CopyFrom(LUnZip, 0);
-            LOutput.Position := 0;
-            og := TOleGraphic.Create;
-            try
-              og.LoadFromStream(LOutput);
-              Image2.Picture.Assign(og);
-            finally
-              og.Free;
-            end;
-          finally
-            LUnZip.Free;
-          end;
+          og.LoadFromStream(LOutput);
+          Image2.Picture.Assign(og);
         finally
-          LOutput.Free;
+          og.Free;
         end;
       finally
-        dm.Free;
+        LOutput.Free;
       end;
     finally
       bs.Free;
@@ -194,9 +176,58 @@ begin
   end;
 end;
 
+function TForm1.CompactStream(Value: TMemoryStream): TMemoryStream;
+var
+  LZip: TZCompressionStream;
+begin
+  Result := TMemoryStream.Create;
+  LZip := TZCompressionStream.Create(Result, zcMax, 15);
+  try
+    Value.Position := 0;
+    { Compress data. }
+    LZip.CopyFrom(Value, Value.Size);
+  finally
+    LZip.Free;
+  end;
+  Result.Position := 0;
+end;
+
+procedure TForm1.Image2Click(Sender: TObject);
+begin
+  Image2.Picture.Graphic := nil;
+end;
+
 procedure TForm1.Memo1Change(Sender: TObject);
 begin
   Label1.Caption := 'Tamanho: ' + IntToStr(Length(Memo1.Text));
+end;
+
+procedure TForm1.Memo2Change(Sender: TObject);
+begin
+  Label2.Caption := 'Tamanho: ' + IntToStr(Length(Memo2.Text));
+end;
+
+function TForm1.StreamToBase64(Value: TMemoryStream): string;
+begin
+  Result := '';
+  if Value <> nil then
+    Result := TIdEncoderMIME.EncodeStream(Value, Value.Size);
+end;
+
+function TForm1.UnpackStram(Value: TMemoryStream): TMemoryStream;
+var
+  LUnZip: TZDecompressionStream;
+begin
+  Value.Position := 0;
+  Result := TMemoryStream.Create;
+  LUnZip := TZDecompressionStream.Create(Value);
+  try
+    { Decompress data. }
+    Result.CopyFrom(LUnZip, 0);
+    Result.Position := 0;
+  finally
+    LUnZip.Free;
+  end;
 end;
 
 end.
